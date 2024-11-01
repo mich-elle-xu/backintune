@@ -1,19 +1,31 @@
-from gpiozero import Buzzer
+from gpiozero import PWMOutputDevice
 from time import sleep
 
-# Initialize the buzzer on GPIO 18
-buzzer = Buzzer(18)
+# Initialize the PWM pin for the buzzer on GPIO 18
+buzzer = PWMOutputDevice(18)
+
+# Set the maximum volume (PWM value)
+max_volume = 1.0  # 100% duty cycle
 
 try:
     while True:
-        buzzer.on()  # Turn on the buzzer
-        print("Buzzer ON")
-        sleep(1)     # Keep it on for 1 second
+        # Set a frequency (in Hz)
+        frequency = 2000  # 2000 Hz is a common frequency for maximizing loudness
         
-        buzzer.off()  # Turn off the buzzer
+        # Set the buzzer to the maximum volume and play a tone
+        buzzer.frequency = frequency
+        buzzer.value = max_volume  # 100% volume
+        print("Buzzer ON at {} Hz".format(frequency))
+        # sleep(1)  # Play for 1 second
+        
+        # Turn off the buzzer
+        buzzer.value = 0.0  # 0% volume
         print("Buzzer OFF")
-        sleep(1)     # Keep it off for 1 second
+        # sleep(1)  # Keep it off for 1 second
 
 except KeyboardInterrupt:
     print("Exiting program")
+
+finally:
+    buzzer.close()  # Clean up when done
 
