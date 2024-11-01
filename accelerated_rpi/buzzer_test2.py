@@ -10,7 +10,7 @@ max_volume = 1.0  # 100% duty cycle
 try:
     while True:
         # Set a frequency (in Hz)
-        frequency = 2000  # 2000 Hz is a common frequency for maximizing loudness
+        frequency = 10000  # 2000 Hz is a common frequency for maximizing loudness
         
         # Set the buzzer to the maximum volume and play a tone
         buzzer.frequency = frequency

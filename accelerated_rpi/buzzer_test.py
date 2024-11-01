@@ -1,28 +1,21 @@
-import RPi.GPIO as GPIO
+import gpiod
 import time
-
-# Set the GPIO mode
-GPIO.setmode(GPIO.BCM)
-
-# Set the buzzer pin
-buzzer_pin = 18
-GPIO.setup(buzzer_pin, GPIO.OUT)
-
+LED_PIN = 18
+# BUTTON_PIN = 27
+chip = gpiod.Chip('gpiochip4')
+led_line = chip.get_line(LED_PIN)
+# button_line = chip.get_line(BUTTON_PIN)
+led_line.request(consumer="LED", type=gpiod.LINE_REQ_DIR_OUT)
+# button_line.request(consumer="Button", type=gpiod.LINE_REQ_DIR_IN)
 try:
-    while True:
-        # Turn the buzzer on
-        GPIO.output(buzzer_pin, GPIO.HIGH)
-        print("Buzzer ON")
-        time.sleep(1)  # Keep it on for 1 second
-        
-        # Turn the buzzer off
-        GPIO.output(buzzer_pin, GPIO.LOW)
-        print("Buzzer OFF")
-        time.sleep(1)  # Keep it off for 1 second
-
-except KeyboardInterrupt:
-    print("Exiting program")
-
+   while True:
+       # button_state = button_line.get_value()
+       # if button_state == 1:
+        led_line.set_value(1)
+        time.sleep(0.001)
+       # else:
+        led_line.set_value(0)
+        time.sleep(0.001)
 finally:
-    # Clean up GPIO settings
-    GPIO.cleanup()
+   led_line.release()
+# button_line.release()
