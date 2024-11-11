@@ -21,13 +21,13 @@ class Hand:
 
     def add_angle(self, angle): 
         # self.hand_angles = self.hand_angles[1:]
-        print("deleting from hand_angles")
+        # print("deleting from hand_angles")
         # np.delete(self.hand_angles, 0)
         self.hand_angles = np.roll(self.hand_angles,-1)
         self.hand_angles[-1] = angle
-        print("adding ", angle, "to hand_hangles")
+        # print("adding ", angle, "to hand_hangles")
         # np.append(self.hand_angles, angle)
-        print(self.hand_angles)
+        # print(self.hand_angles)
         self.all_angles.append(angle)
     
 

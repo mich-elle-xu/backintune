@@ -1,5 +1,3 @@
-
-
 # things to store: 
     # which hand 
     # neutral vector 
