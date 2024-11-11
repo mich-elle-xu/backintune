@@ -83,7 +83,6 @@ def tense_routine(video_path):
                     # print("cur vector is: ", cur_vector)
                     # print(left_hand.hand_angles)
                     # print(left_hand.all_angles)
-                    
             else: 
                 print("No hands detected, ignoring frame.")
             # if there's been an update to the data 
