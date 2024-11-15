@@ -840,6 +840,8 @@ while True:
             cv2.destroyWindow(profile_fps_title)
 
     if key == 27 or key == 113: # ESC or 'q':
+        print(left_hand.all_angles)
+        print(right_hand.all_angles)
         break
 
     # Update the real-time FPS counter
