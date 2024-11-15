@@ -60,6 +60,22 @@ from hand_info import Hand
 
 import getpass
 import socket
+from threading import Thread
+
+from gpiozero import PWMOutputDevice
+# Define the buzzer on GPIO 17 (BCM pin 17)
+buzzer = PWMOutputDevice(17)
+
+def play_frequency(frequency):
+    # Frequency range for PWM control is 0-1000 Hz (adjustable)
+    buzzer.frequency = frequency
+    buzzer.value = 0.2  # 50% duty cycle to produce sound
+    time.sleep(0.1)  # Play the tone for 0.25 seconds
+    buzzer.off()  # Turn off the buzzer after playing
+
+# Example usage
+# play_frequency(1000)  # 1000 Hz
+
 user = getpass.getuser()
 host = socket.gethostname()
 user_host_descriptor = user+"@"+host
@@ -581,6 +597,10 @@ while True:
                             right_hand.update_tension()
                             print(right_hand.tension_states)
                             # TODO: use right_hand.tense bool value to see if it's tense for buzzer
+                            if right_hand.tense:
+                                buzz_thread = Thread(target = play_frequency, args = (1000,))
+                                buzz_thread.daemon = True
+                                buzz_thread.start()
                         else:
                             left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
                     elif blaze_landmark_type == "blazefacelandmark":
