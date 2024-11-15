@@ -5,6 +5,8 @@ class Hand:
     def __init__(self, len_data, handedness): 
         self.handedness = handedness
         self.hand_angles = np.zeros(len_data) 
+        self.tension_states = np.zeros(len_data)
+        self.tense = False
         self.neutral = np.array([0, 1])
         self.all_angles = []
     
@@ -29,6 +31,27 @@ class Hand:
         # np.append(self.hand_angles, angle)
         # print(self.hand_angles)
         self.all_angles.append(angle)
-    
 
-    
+    def update_tension_states(self, threshold=0.5, window_size=3):
+        # Compute the difference between consecutive wrist angles (rate of change)
+        angle_changes = np.abs(np.diff(self.hand_angles, n=1))
+        
+        # Create a sliding window of changes and compute the average change in that window
+        avg_changes = np.convolve(angle_changes, np.ones(window_size), mode='same') / window_size
+        
+        # Areas where the average change is less than the threshold are considered 'tension'
+        tension_zones = avg_changes < threshold
+        tension_zones = np.concatenate(([False], tension_zones))
+        
+        is_tension = np.sum(tension_zones) > (len(tension_zones) / 2)
+        print(self.handedness + ": " + str(is_tension))
+        return is_tension
+
+    def update_tension(self): 
+        temp = 0
+        for val in self.tensions_states: 
+            if val: 
+                temp += 1
+
+        if temp > len(self.tensions_states) / 2: 
+            self.tense = True
