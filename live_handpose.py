@@ -35,12 +35,12 @@ def main():
             if results.multi_hand_landmarks: 
                 for ind, landmark in enumerate(results.multi_hand_landmarks): 
                     # print(type(landmark))
-                    mp_drawing.draw_landmarks(
-                        image,
-                        landmark,
-                        mp_hands.HAND_CONNECTIONS,
-                        mp_drawing_styles.get_default_hand_landmarks_style(),
-                        mp_drawing_styles.get_default_hand_connections_style())
+                    # mp_drawing.draw_landmarks(
+                    #     image,
+                    #     landmark,
+                    #     mp_hands.HAND_CONNECTIONS,
+                    #     mp_drawing_styles.get_default_hand_landmarks_style(),
+                    #     mp_drawing_styles.get_default_hand_connections_style())
                     # print(ind)
                     label = results.multi_handedness[ind].classification[0].label
                     if label == "Right":
