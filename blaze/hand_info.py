@@ -54,9 +54,9 @@ class Hand:
 
     def update_tension(self): 
         temp = 0
-        for val in self.tension_states: 
-            if val: 
-                temp += 1
+        temp = sum(self.tension_states)
 
         if temp > len(self.tension_states) / 2: 
             self.tense = True
+        else:
+            self.tense = False

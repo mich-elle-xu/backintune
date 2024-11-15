@@ -595,12 +595,7 @@ while True:
                             right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
                             right_hand.update_tension_states()
                             right_hand.update_tension()
-                            print(right_hand.tension_states)
-                            # TODO: use right_hand.tense bool value to see if it's tense for buzzer
-                            if right_hand.tense:
-                                buzz_thread = Thread(target = play_frequency, args = (1000,))
-                                buzz_thread.daemon = True
-                                buzz_thread.start()
+                            # print(right_hand.tension_states)
                         else:
                             left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
                     elif blaze_landmark_type == "blazefacelandmark":
@@ -611,6 +606,13 @@ while True:
                         else:
                             draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
                    
+                print("right_hand.tense", right_hand.tense)
+                print("right_hand.tension_states", right_hand.tension_states)
+                if right_hand.tense:
+                    buzz_thread = Thread(target = play_frequency, args = (1000,))
+                    buzz_thread.daemon = True
+                    buzz_thread.start()
+
                 draw_roi(output,roi_box)
                 draw_detections(output,detections)
                 profile_annotate = timer()-start
