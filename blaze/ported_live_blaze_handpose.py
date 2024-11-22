@@ -44,7 +44,7 @@ import itertools
 from ctypes import *
 from typing import List
 import pathlib
-#import threading
+import threading
 import time
 import sys
 import argparse
@@ -60,17 +60,37 @@ from hand_info import Hand
 
 import getpass
 import socket
-from threading import Thread
+# from threading import Thread
 
 from gpiozero import PWMOutputDevice
 # Define the buzzer on GPIO 17 (BCM pin 17)
 buzzer = PWMOutputDevice(17)
 
+# TODO: set these values with web app
+buzz_val = 0.2
+bViewOutput = True
+time_btwn_buzz = 2
+
+tension = False
+
+def buzz_per_sec():
+    if tension:
+        play_frequency(1000)
+        buzz_thread = threading.Timer(time_btwn_buzz,buzz_per_sec)
+        buzz_thread.daemon = True
+        buzz_thread.start()
+    else:
+        return
+
+def set_buzzer():
+    global buzz_en
+    buzz_en = True
+
 def play_frequency(frequency):
+    print("BUZZ")
     # Frequency range for PWM control is 0-1000 Hz (adjustable)
     buzzer.frequency = frequency
-    # buzzer.value = 0.2  # 50% duty cycle to produce sound
-    buzzer.value = 0
+    buzzer.value = buzz_val
     time.sleep(0.1)  # Play the tone for 0.25 seconds
     buzzer.off()  # Turn off the buzzer after playing
 
@@ -134,7 +154,7 @@ text_lineType = cv2.LINE_AA
 ap = argparse.ArgumentParser()
 ap.add_argument('-i', '--input'      , type=str, default="", help="Video input device. Default is auto-detect (first usbcam)")
 ap.add_argument('-d', '--debug'      , default=False, action='store_true', help="Enable Debug mode. Default is off")
-ap.add_argument('-w', '--withoutview', default=False, action='store_true', help="Disable Output viewing. Default is on")
+# ap.add_argument('-w', '--withoutview', default=False, action='store_true', help="Disable Output viewing. Default is on")
 ap.add_argument('-f', '--fps'        , default=False, action='store_true', help="Enable FPS display. Default is off")
 
 args = ap.parse_args()  
@@ -142,7 +162,6 @@ args = ap.parse_args()
 print('Command line options:')
 print(' --input       : ', args.input)
 print(' --debug       : ', args.debug)
-print(' --withoutview : ', args.withoutview)
 print(' --fps         : ', args.fps)
 
 
@@ -263,12 +282,9 @@ print("================================================================")
 print("Blaze Detect Live Demo")
 print("================================================================")
 
-bWrite = False
 bShowDebugImage = False
 
 bShowFPS = True
-
-bViewOutput = not args.withoutview
 
 def ignore(x):
     pass
@@ -303,168 +319,184 @@ rt_fps_message = "FPS: {0:.2f}".format(rt_fps)
 rt_fps_x = int(10*scale)
 rt_fps_y = int((frame_height-10)*scale)
 
-while True:
-    # init the real-time FPS counter
-    if rt_fps_count == 0:
-        rt_fps_time = cv2.getTickCount()
+frames = []
 
-    frame_count = frame_count + 1
+try:
+    while True:
+        # init the real-time FPS counter
+        if rt_fps_count == 0:
+            rt_fps_time = cv2.getTickCount()
 
-    flag, frame = cap.read()
-    if not flag:
-        print("[ERROR] cap.read() FAILEd !")
-        break
-    
-    if blaze_pipelines["supported"] and blaze_pipelines["selected"]:
+        frame_count = frame_count + 1
 
-        image = frame.copy()
-        
-        blaze_detector_type = blaze_pipelines["detector_type"]
-        blaze_landmark_type = blaze_pipelines["landmark_type"]
-        blaze_title = blaze_pipelines["pipeline"]
-        blaze_detector = blaze_pipelines["detector"]
-        blaze_landmark = blaze_pipelines["landmark"]
-        
-        app_main_title = blaze_title+" Demo"
-        app_ctrl_title = blaze_title+" Demo"
-        app_debug_title = blaze_title+" Debug"
-        
-        # Get trackbar values
-        if bViewOutput:
-            thresh_min_score = cv2.getTrackbarPos('threshMinScore', app_ctrl_title)
-            if thresh_min_score < 10:
-                thresh_min_score = 10
-                cv2.setTrackbarPos('threshMinScore', app_ctrl_title,thresh_min_score)
-            thresh_min_score = thresh_min_score*(1/100)
-            if thresh_min_score != thresh_min_score_prev:
-                blaze_detector.min_score_thresh = thresh_min_score
-                thresh_min_score_prev = thresh_min_score
+        flag, frame = cap.read()
+        if not flag:
+            print("[ERROR] cap.read() FAILEd !")
+            break
+
+        if blaze_pipelines["supported"] and blaze_pipelines["selected"]:
+
+            image = frame.copy()
             
+            blaze_detector_type = blaze_pipelines["detector_type"]
+            blaze_landmark_type = blaze_pipelines["landmark_type"]
+            blaze_title = blaze_pipelines["pipeline"]
+            blaze_detector = blaze_pipelines["detector"]
+            blaze_landmark = blaze_pipelines["landmark"]
             
-        #image = cv2.resize(image,(0,0), fx=scale, fy=scale) 
-        output = image.copy()
-        
-        # BlazePalm pipeline
-        
-        start = timer()
-        image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-        img1,scale1,pad1=blaze_detector.resize_pad(image)
-        profile_resize = timer()-start
-
-        if bShowDebugImage:
-            # show the resized input image
-            debug_img = img1.astype(np.float32)/255.0
-            debug_img = cv2.resize(debug_img,(blaze_landmark.resolution,blaze_landmark.resolution))
-        
-        normalized_detections = blaze_detector.predict_on_image(img1)
-        if len(normalized_detections) > 0:
-
-            start = timer()          
-            detections = blaze_detector.denormalize_detections(normalized_detections,scale1,pad1)
+            app_main_title = blaze_title+" Demo"
+            app_ctrl_title = blaze_title+" Demo"
+            app_debug_title = blaze_title+" Debug"
+            
+            # Get trackbar values
+            if bViewOutput:
+                thresh_min_score = cv2.getTrackbarPos('threshMinScore', app_ctrl_title)
+                if thresh_min_score < 10:
+                    thresh_min_score = 10
+                    cv2.setTrackbarPos('threshMinScore', app_ctrl_title,thresh_min_score)
+                thresh_min_score = thresh_min_score*(1/100)
+                if thresh_min_score != thresh_min_score_prev:
+                    blaze_detector.min_score_thresh = thresh_min_score
+                    thresh_min_score_prev = thresh_min_score
                 
-            xc,yc,scale,theta = blaze_detector.detection2roi(detections)
-            roi_img,roi_affine,roi_box = blaze_landmark.extract_roi(image,xc,yc,theta,scale)
-            profile_extract = timer()-start
-
-            flags, normalized_landmarks = blaze_landmark.predict(roi_img)
-            print(flags, normalized_landmarks)
+                
+            #image = cv2.resize(image,(0,0), fx=scale, fy=scale) 
+            output = image.copy()
             
+            # BlazePalm pipeline
+            
+            start = timer()
+            image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+            img1,scale1,pad1=blaze_detector.resize_pad(image)
+            profile_resize = timer()-start
+
             if bShowDebugImage:
-                # show the ROIs
-                for i in range(roi_img.shape[0]):
-                    #roi_landmarks = np.expand_dims(normalized_landmarks[i,:,:].copy(), axis=0)
-                    roi_landmarks = normalized_landmarks[i,:,:].copy()
-                    roi_landmarks = roi_landmarks*blaze_landmark.resolution
+                # show the resized input image
+                debug_img = img1.astype(np.float32)/255.0
+                debug_img = cv2.resize(debug_img,(blaze_landmark.resolution,blaze_landmark.resolution))
+            
+            normalized_detections = blaze_detector.predict_on_image(img1)
+            if len(normalized_detections) > 0:
+
+                start = timer()          
+                detections = blaze_detector.denormalize_detections(normalized_detections,scale1,pad1)
+                    
+                xc,yc,scale,theta = blaze_detector.detection2roi(detections)
+                roi_img,roi_affine,roi_box = blaze_landmark.extract_roi(image,xc,yc,theta,scale)
+                profile_extract = timer()-start
+
+                flags, normalized_landmarks = blaze_landmark.predict(roi_img)
+                # print(flags, normalized_landmarks)
+                
+                if bShowDebugImage:
+                    # show the ROIs
+                    for i in range(roi_img.shape[0]):
+                        #roi_landmarks = np.expand_dims(normalized_landmarks[i,:,:].copy(), axis=0)
+                        roi_landmarks = normalized_landmarks[i,:,:].copy()
+                        roi_landmarks = roi_landmarks*blaze_landmark.resolution
+                        if blaze_landmark_type == "blazehandlandmark":
+                            draw_landmarks(roi_img[i], roi_landmarks[:,:2], HAND_CONNECTIONS, size=2)
+                        elif blaze_landmark_type == "blazefacelandmark":
+                            draw_landmarks(roi_img[i], roi_landmarks[:,:2], FACE_CONNECTIONS, size=1)                                    
+                        elif blaze_landmark_type == "blazeposelandmark":
+                            if roi_landmarks.shape[1] > 33:
+                                draw_landmarks(roi_img[i], roi_landmarks[:,:2], POSE_FULL_BODY_CONNECTIONS, size=2)
+                            else:
+                                draw_landmarks(roi_img[i], roi_landmarks[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
+                        debug_img = cv2.hconcat([debug_img,roi_img[i]])
+
+                start = timer() 
+                landmarks = blaze_landmark.denormalize_landmarks(normalized_landmarks, roi_affine)
+
+                for i in range(len(flags)):
+                    landmark, flag = landmarks[i], flags[i]
+                    #if True: #flag>.5:
                     if blaze_landmark_type == "blazehandlandmark":
-                        draw_landmarks(roi_img[i], roi_landmarks[:,:2], HAND_CONNECTIONS, size=2)
-                    elif blaze_landmark_type == "blazefacelandmark":
-                        draw_landmarks(roi_img[i], roi_landmarks[:,:2], FACE_CONNECTIONS, size=1)                                    
-                    elif blaze_landmark_type == "blazeposelandmark":
-                        if roi_landmarks.shape[1] > 33:
-                            draw_landmarks(roi_img[i], roi_landmarks[:,:2], POSE_FULL_BODY_CONNECTIONS, size=2)
+                        draw_landmarks(output, landmark[:,:2], HAND_CONNECTIONS, size=2)
+                        wrist_pos = np.array(landmark[0, :2])
+                        middle_finger_pos = np.array(landmark[9, :2])
+                        cur_vector = np.subtract(middle_finger_pos, wrist_pos)
+                        if (i == 0): 
+                            right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
+                            right_hand.update_tension_states()
+                            right_hand.update_tension()
                         else:
-                            draw_landmarks(roi_img[i], roi_landmarks[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
-                    debug_img = cv2.hconcat([debug_img,roi_img[i]])
+                            left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
+                    elif blaze_landmark_type == "blazefacelandmark":
+                        draw_landmarks(output, landmark[:,:2], FACE_CONNECTIONS, size=1)                                    
+                    elif blaze_landmark_type == "blazeposelandmark":
+                        if landmarks.shape[1] > 33:
+                            draw_landmarks(output, landmark[:,:2], POSE_FULL_BODY_CONNECTIONS, size=2)
+                        else:
+                            draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
+                    
+                if right_hand.tense and not tension:
+                    print("TENSE")
+                    play_frequency(1000)
+                    tension = True
+                    buzz_thread = threading.Timer(time_btwn_buzz, buzz_per_sec)
+                    buzz_thread.daemon = True  # Make it a daemon thread
+                    buzz_thread.start()
+                elif not right_hand.tense and tension:
+                    print("NOT TENSE")
+                    tension = False
 
-            start = timer() 
-            landmarks = blaze_landmark.denormalize_landmarks(normalized_landmarks, roi_affine)
+                draw_roi(output,roi_box)
+                draw_detections(output,detections)
+                profile_annotate = timer()-start
 
-            for i in range(len(flags)):
-                landmark, flag = landmarks[i], flags[i]
-                #if True: #flag>.5:
-                if blaze_landmark_type == "blazehandlandmark":
-                    draw_landmarks(output, landmark[:,:2], HAND_CONNECTIONS, size=2)
-                    wrist_pos = np.array(landmark[0, :2])
-                    middle_finger_pos = np.array(landmark[9, :2])
-                    cur_vector = np.subtract(middle_finger_pos, wrist_pos)
-                    if (i == 0): 
-                        right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
-                        right_hand.update_tension_states()
-                        right_hand.update_tension()
-                        # print(right_hand.tension_states)
-                    else:
-                        left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
-                elif blaze_landmark_type == "blazefacelandmark":
-                    draw_landmarks(output, landmark[:,:2], FACE_CONNECTIONS, size=1)                                    
-                elif blaze_landmark_type == "blazeposelandmark":
-                    if landmarks.shape[1] > 33:
-                        draw_landmarks(output, landmark[:,:2], POSE_FULL_BODY_CONNECTIONS, size=2)
-                    else:
-                        draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
-                
-            print("right_hand.tense", right_hand.tense)
-            print("right_hand.tension_states", right_hand.tension_states)
-            if right_hand.tense:
-                buzz_thread = Thread(target = play_frequency, args = (1000,))
-                buzz_thread.daemon = True
-                buzz_thread.start()
-
-            draw_roi(output,roi_box)
-            draw_detections(output,detections)
-            profile_annotate = timer()-start
-
-        if bShowDebugImage:
-            if debug_img.shape[0] == debug_img.shape[1]:
-                zero_img = np.full_like(debug_img,0.0)
-                debug_img = cv2.hconcat([debug_img,zero_img])
-            debug_img = cv2.cvtColor(debug_img,cv2.COLOR_RGB2BGR)
-            cv2.imshow(app_debug_title, debug_img)
-            
-        # display real-time FPS counter (if valid)
-        if rt_fps_valid == True and bShowFPS:
-            cv2.putText(output,rt_fps_message, (rt_fps_x,rt_fps_y),text_fontType,text_fontSize,text_color,text_lineSize,text_lineType)
-
-        if bViewOutput:                
-            # show the output image
-            cv2.imshow(app_main_title, output)
-
-        if bWrite:
-            filename = ("blaze_detect_live_frame%04d_%s_input.tif"%(frame_count,blaze_title))
-            print("Capturing ",filename," ...")
-            input_img = cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
-            cv2.imwrite(os.path.join(output_dir,filename),input_img)
-
-            filename = ("blaze_detect_live_frame%04d_%s_detection.tif"%(frame_count,blaze_title))
-            print("Capturing ",filename," ...")
-            cv2.imwrite(os.path.join(output_dir,filename),output)
-    
             if bShowDebugImage:
-                filename = ("blaze_detect_live_frame%04d_%s_debug.tif"%(frame_count,blaze_title))
-                print("Capturing ",filename," ...")
-                cv2.imwrite(os.path.join(output_dir,filename),debug_img)
+                if debug_img.shape[0] == debug_img.shape[1]:
+                    zero_img = np.full_like(debug_img,0.0)
+                    debug_img = cv2.hconcat([debug_img,zero_img])
+                debug_img = cv2.cvtColor(debug_img,cv2.COLOR_RGB2BGR)
+                cv2.imshow(app_debug_title, debug_img)
+                
+            # display real-time FPS counter (if valid)
+            if rt_fps_valid == True and bShowFPS:
+                cv2.putText(output,rt_fps_message, (rt_fps_x,rt_fps_y),text_fontType,text_fontSize,text_color,text_lineSize,text_lineType)
+
+            if bViewOutput:                
+                # show the output image
+                cv2.imshow(app_main_title, output)
             
-    cv2.waitKey(1)
+            # TODO: enable this through web app?
+            frames += [output]
+                
+        cv2.waitKey(1)
 
-    # Update the real-time FPS counter
-    rt_fps_count = rt_fps_count + 1
-    if rt_fps_count == 10:
-        t = (cv2.getTickCount() - rt_fps_time)/cv2.getTickFrequency()
-        rt_fps_valid = 1
-        rt_fps = 10.0/t
-        rt_fps_message = "FPS: {0:.2f}".format(rt_fps)
-        #print("[INFO] ",rt_fps_message)
-        rt_fps_count = 0
+        # Update the real-time FPS counter
+        rt_fps_count = rt_fps_count + 1
+        if rt_fps_count == 10:
+            t = (cv2.getTickCount() - rt_fps_time)/cv2.getTickFrequency()
+            rt_fps_valid = 1
+            rt_fps = 10.0/t
+            rt_fps_message = "FPS: {0:.2f}".format(rt_fps)
+            #print("[INFO] ",rt_fps_message)
+            rt_fps_count = 0
 
-# Cleanup
-f_profile_csv.close()
-cv2.destroyAllWindows()
+
+except KeyboardInterrupt:
+    print("Process interrupted by user.")
+
+finally:
+    # Get the size of the first frame (ensure all frames are the same size)
+    height, width, _ = frames[0].shape
+
+    # Create a unique filename using the current time or any other method you prefer
+    unique_filename = f"{int(time.time())}.mp4"  # Unique name based on timestamp
+
+    # Define the codec and create a VideoWriter object
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'mp4v' for MP4 format (or another codec)
+    # TODO: this fps might not reflect the fluctuating framerate of processing while playing
+    fps = 20  # Frames per second, adjust based on your needs
+    output_video = cv2.VideoWriter(unique_filename, fourcc, fps, (width, height))
+
+    # Write frames to video
+    for frame in frames:
+        output_video.write(frame)  # Write each frame to the video
+
+    # Cleanup
+    output_video.release()
+    f_profile_csv.close()
+    cv2.destroyAllWindows()
