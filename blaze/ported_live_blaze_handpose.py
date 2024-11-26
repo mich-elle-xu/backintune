@@ -76,6 +76,8 @@ buzz_val = 0.2
 bViewOutput = True
 time_btwn_buzz = 2
 
+gcolor = ""
+
 def set_buzzer_vol(vol):
     global buzz_val
     buzz_val = vol/100.0
@@ -108,7 +110,17 @@ def play_frequency(frequency):
     buzzer.off()  # Turn off the buzzer after playing
 
 def set_color(color):
-    requests.get(esp32_ip + color)
+    # print("COLOR", color)
+    global gcolor
+    # if color != gcolor:
+    try:
+        requests.get(esp32_ip + color)
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection error occurred: {e}")
+    except requests.exceptions.Timeout as e:
+        print(f"Request timed out: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error during request: {e}")
 
 user = getpass.getuser()
 host = socket.gethostname()
@@ -392,9 +404,12 @@ try:
             
             normalized_detections = blaze_detector.predict_on_image(img1)
             if len(normalized_detections) <= 0:
-                red = threading.Thread(target=set_color, args=("/red",))
-                red.daemon = True
-                red.start()
+                if "/red" != gcolor:
+                    gcolor = "/red"
+                    red = threading.Thread(target=set_color, args=("/red",))
+                    red.daemon = True
+                    red.start()
+                # requests.get(esp32_ip + "/red")   # Turn LED red
             else:
 
                 start = timer()          
@@ -428,15 +443,20 @@ try:
                 landmarks = blaze_landmark.denormalize_landmarks(normalized_landmarks, roi_affine)
                 
                 if len(landmarks) < 2:
-                #     requests.get(esp32_ip + "/red")   # Turn LED red
-                    red = threading.Thread(target=set_color, args=("/red",))
-                    red.daemon = True
-                    red.start()
+                    # requests.get(esp32_ip + "/red")   # Turn LED red
+                    if "/red" != gcolor:
+                        gcolor = "/red"
+                        red = threading.Thread(target=set_color, args=("/red",))
+                        red.daemon = True
+                        red.start()
                 else:
-                #     requests.get(esp32_ip + "/green") # Turn LED green
-                    green = threading.Thread(target=set_color, args=("/green",))
-                    green.daemon = True
-                    green.start()
+                    # requests.get(esp32_ip + "/green") # Turn LED green
+                    # print("GREEN")
+                    if "/green" != gcolor:
+                        gcolor = "/green"
+                        green = threading.Thread(target=set_color, args=("/green",))
+                        green.daemon = True
+                        green.start()
 
                 for i in range(len(flags)):
                     landmark, flag = landmarks[i], flags[i]
