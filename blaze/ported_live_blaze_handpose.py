@@ -41,6 +41,8 @@ import os
 from datetime import datetime
 import itertools
 
+import requests
+
 from ctypes import *
 from typing import List
 import pathlib
@@ -66,10 +68,25 @@ from gpiozero import PWMOutputDevice
 # Define the buzzer on GPIO 17 (BCM pin 17)
 buzzer = PWMOutputDevice(17)
 
-# TODO: set these values with web app
+esp32_ip = "http://172.26.175.168"
+requests.get(esp32_ip + "/off")  # Turn LED off
+
+# TODO: set these values with web app (following 3 functions)
 buzz_val = 0.2
 bViewOutput = True
 time_btwn_buzz = 2
+
+def set_buzzer_vol(vol):
+    global buzz_val
+    buzz_val = vol/100.0
+
+def set_display(display):
+    global bViewOutput
+    bViewOutput = display
+
+def set_time_btwn_buzz(secs):
+    global time_btwn_buzz
+    time_btwn_buzz = secs
 
 tension = False
 
@@ -82,10 +99,6 @@ def buzz_per_sec():
     else:
         return
 
-def set_buzzer():
-    global buzz_en
-    buzz_en = True
-
 def play_frequency(frequency):
     print("BUZZ")
     # Frequency range for PWM control is 0-1000 Hz (adjustable)
@@ -93,6 +106,9 @@ def play_frequency(frequency):
     buzzer.value = buzz_val
     time.sleep(0.1)  # Play the tone for 0.25 seconds
     buzzer.off()  # Turn off the buzzer after playing
+
+def set_color(color):
+    requests.get(esp32_ip + color)
 
 user = getpass.getuser()
 host = socket.gethostname()
@@ -283,7 +299,6 @@ print("Blaze Detect Live Demo")
 print("================================================================")
 
 bShowDebugImage = False
-
 bShowFPS = True
 
 def ignore(x):
@@ -376,7 +391,11 @@ try:
                 debug_img = cv2.resize(debug_img,(blaze_landmark.resolution,blaze_landmark.resolution))
             
             normalized_detections = blaze_detector.predict_on_image(img1)
-            if len(normalized_detections) > 0:
+            if len(normalized_detections) <= 0:
+                red = threading.Thread(target=set_color, args=("/red",))
+                red.daemon = True
+                red.start()
+            else:
 
                 start = timer()          
                 detections = blaze_detector.denormalize_detections(normalized_detections,scale1,pad1)
@@ -407,6 +426,17 @@ try:
 
                 start = timer() 
                 landmarks = blaze_landmark.denormalize_landmarks(normalized_landmarks, roi_affine)
+                
+                if len(landmarks) < 2:
+                #     requests.get(esp32_ip + "/red")   # Turn LED red
+                    red = threading.Thread(target=set_color, args=("/red",))
+                    red.daemon = True
+                    red.start()
+                else:
+                #     requests.get(esp32_ip + "/green") # Turn LED green
+                    green = threading.Thread(target=set_color, args=("/green",))
+                    green.daemon = True
+                    green.start()
 
                 for i in range(len(flags)):
                     landmark, flag = landmarks[i], flags[i]
@@ -480,11 +510,14 @@ except KeyboardInterrupt:
     print("Process interrupted by user.")
 
 finally:
+    print("FINALLY")
+    requests.get(esp32_ip + "/off")  # Turn LED off
     # Get the size of the first frame (ensure all frames are the same size)
     height, width, _ = frames[0].shape
 
     # Create a unique filename using the current time or any other method you prefer
-    unique_filename = f"{int(time.time())}.mp4"  # Unique name based on timestamp
+    unique_filename = f"/home/jessiefan/backintune/accelerated_rpi/django-volt-dashboard/videos/{int(time.time())}.mp4"  # Unique name based on timestamp
+    # unique_filename = f"{int(time.time())}.mp4"  # Unique name based on timestamp
 
     # Define the codec and create a VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'mp4v' for MP4 format (or another codec)
