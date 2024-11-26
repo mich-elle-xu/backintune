@@ -52,6 +52,7 @@ import glob
 import subprocess
 import re
 import sys
+import requests
 
 from datetime import datetime
 import plotly.graph_objects as go
@@ -66,12 +67,18 @@ from gpiozero import PWMOutputDevice
 # Define the buzzer on GPIO 17 (BCM pin 17)
 buzzer = PWMOutputDevice(17)
 
+esp32_ip = "http://172.26.175.168"
+
 # TODO: set these values with web app
 buzz_val = 0.2
 bViewOutput = False
 time_btwn_buzz = 2
 
 tension = False
+gcolor = ""
+
+# curr_thread = None
+# thread_count = 0
 
 def buzz_per_sec():
     if tension:
@@ -80,11 +87,8 @@ def buzz_per_sec():
         buzz_thread.daemon = True
         buzz_thread.start()
     else:
+        # thread_count -= 1
         return
-
-def set_buzzer():
-    global buzz_en
-    buzz_en = True
 
 def play_frequency(frequency):
     print("BUZZ")
@@ -93,6 +97,24 @@ def play_frequency(frequency):
     buzzer.value = buzz_val
     time.sleep(0.1)  # Play the tone for 0.25 seconds
     buzzer.off()  # Turn off the buzzer after playing
+
+def set_color(color):
+    # return
+    try:
+        requests.get(esp32_ip + color, timeout = 3)
+    except requests.exceptions.ConnectionError as e:
+        print(f"Connection error occurred: {e}")
+        time.sleep(0.1)
+        set_color(color)
+    except requests.exceptions.Timeout as e:
+        print(f"Request timed out: {e}")
+    except requests.exceptions.ConnectTimeout as e:
+        print(f"Request timed out: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error during request: {e}")
+
+# requests.get(esp32_ip + "/off")  # Turn LED off
+set_color("/off")
 
 user = getpass.getuser()
 host = socket.gethostname()
@@ -156,6 +178,9 @@ ap.add_argument('-i', '--input'      , type=str, default="", help="Video input d
 ap.add_argument('-d', '--debug'      , default=False, action='store_true', help="Enable Debug mode. Default is off")
 # ap.add_argument('-w', '--withoutview', default=False, action='store_true', help="Disable Output viewing. Default is on")
 ap.add_argument('-f', '--fps'        , default=False, action='store_true', help="Enable FPS display. Default is off")
+ap.add_argument('-a', '--vol', type=int, default=20)
+ap.add_argument('-b', '--buzz', type=int, default=1)
+ap.add_argument('-c', '--display', default=False)
 
 args = ap.parse_args()  
   
@@ -163,6 +188,14 @@ print('Command line options:')
 print(' --input       : ', args.input)
 print(' --debug       : ', args.debug)
 print(' --fps         : ', args.fps)
+
+buzz_val = float(args.vol)/100.0
+bViewOutput = (args.display == "True")
+time_btwn_buzz = int(args.buzz)
+
+print("DISPLAY:", " type:", type(bViewOutput), " val:", bViewOutput)
+print("BUZZ:", " type:", type(time_btwn_buzz), " val:", time_btwn_buzz)
+print("VOL:", " type:", type(buzz_val), " val:", buzz_val)
 
 
 blaze_pipelines = {}
@@ -376,6 +409,12 @@ try:
                 debug_img = cv2.resize(debug_img,(blaze_landmark.resolution,blaze_landmark.resolution))
             
             normalized_detections = blaze_detector.predict_on_image(img1)
+            if len(normalized_detections) <= 0:
+                if "/red" != gcolor:
+                    gcolor = "/red"
+                    red = threading.Thread(target=set_color, args=("/red",))
+                    red.daemon = True
+                    red.start()
             if len(normalized_detections) > 0:
 
                 start = timer()          
@@ -408,6 +447,22 @@ try:
                 start = timer() 
                 landmarks = blaze_landmark.denormalize_landmarks(normalized_landmarks, roi_affine)
 
+                if len(landmarks) < 2:
+                    # requests.get(esp32_ip + "/red")   # Turn LED red
+                    if "/red" != gcolor:
+                        gcolor = "/red"
+                        red = threading.Thread(target=set_color, args=("/red",))
+                        red.daemon = True
+                        red.start()
+                else:
+                    # requests.get(esp32_ip + "/green") # Turn LED green
+                    # print("GREEN")
+                    if "/green" != gcolor:
+                        gcolor = "/green"
+                        green = threading.Thread(target=set_color, args=("/green",))
+                        green.daemon = True
+                        green.start()
+
                 for i in range(len(flags)):
                     landmark, flag = landmarks[i], flags[i]
                     #if True: #flag>.5:
@@ -435,6 +490,8 @@ try:
                     play_frequency(1000)
                     tension = True
                     buzz_thread = threading.Timer(time_btwn_buzz, buzz_per_sec)
+                    # curr_thread = buzz_thread
+                    # thread_count += 1
                     buzz_thread.daemon = True  # Make it a daemon thread
                     buzz_thread.start()
                 elif not right_hand.tense and tension:
@@ -480,6 +537,9 @@ except KeyboardInterrupt:
     print("Process interrupted by user.")
 
 finally:
+    print("FINALLY")
+    # requests.get(esp32_ip + "/off")  # Turn LED off
+    set_color("/off")
     # Get the size of the first frame (ensure all frames are the same size)
     height, width, _ = frames[0].shape
 
