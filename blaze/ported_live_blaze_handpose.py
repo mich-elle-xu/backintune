@@ -74,21 +74,44 @@ buzz_val = 0.2
 bViewOutput = False
 time_btwn_buzz = 2
 
-tension = False
+# tension = False
+relax = threading.Event()
+mutex = threading.Lock()
 gcolor = ""
 
 # curr_thread = None
 # thread_count = 0
+# existTimers = False
 
 def buzz_per_sec():
-    if tension:
+    print("new thread")
+    # global existTimers
+    # if tension:
+    # while tension:
+    while True:
         play_frequency(1000)
-        buzz_thread = threading.Timer(time_btwn_buzz,buzz_per_sec)
-        buzz_thread.daemon = True
-        buzz_thread.start()
-    else:
+        interrupted = relax.wait(time_btwn_buzz)
+        if interrupted:
+            print("thread terminated")
+            return
+        else:
+            print("time_btwn_buzz passed")
+    # else:
+        # buzz_per_sec()
+        # buzz_thread = threading.Timer(time_btwn_buzz,buzz_per_sec)
+        # buzz_thread.daemon = True
+        # buzz_thread.start()
+    # else:
         # thread_count -= 1
-        return
+        # existTimers = False
+        # return
+
+# def poll_tense():
+#     while True:
+#         if not existTimers and tension:
+#             buzz_thread = threading.Timer(time_btwn_buzz, target=buzz_per_sec)
+#             buzz_thread.daemon = True
+#             buzz_thread.start()
 
 def play_frequency(frequency):
     print("BUZZ")
@@ -354,6 +377,10 @@ rt_fps_y = int((frame_height-10)*scale)
 
 frames = []
 
+# poll_thread = threading.Thread(target=poll_tense)
+# poll_thread.daemon = True
+# poll_thread.start()
+
 try:
     while True:
         # init the real-time FPS counter
@@ -410,11 +437,16 @@ try:
             
             normalized_detections = blaze_detector.predict_on_image(img1)
             if len(normalized_detections) <= 0:
+                # if not relax.is_set():
+                #     print("NOT TENSE ==> hands exited")
+                #     with mutex:
+                #         relax.set()
                 if "/red" != gcolor:
                     gcolor = "/red"
                     red = threading.Thread(target=set_color, args=("/red",))
                     red.daemon = True
                     red.start()
+                    # tension = False
             if len(normalized_detections) > 0:
 
                 start = timer()          
@@ -485,18 +517,22 @@ try:
                         else:
                             draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
                     
-                if right_hand.tense and not tension:
+                if right_hand.tense and relax.is_set():
                     print("TENSE")
-                    play_frequency(1000)
-                    tension = True
-                    buzz_thread = threading.Timer(time_btwn_buzz, buzz_per_sec)
+                    # play_frequency(1000)
+                    # tension = True
+                    with mutex:
+                        relax.clear()
+                    buzz_thread = threading.Thread(target=buzz_per_sec)
                     # curr_thread = buzz_thread
                     # thread_count += 1
                     buzz_thread.daemon = True  # Make it a daemon thread
                     buzz_thread.start()
-                elif not right_hand.tense and tension:
+                elif not right_hand.tense and not relax.is_set():
                     print("NOT TENSE")
-                    tension = False
+                    # tension = False
+                    with mutex:
+                        relax.set()
 
                 draw_roi(output,roi_box)
                 draw_detections(output,detections)
