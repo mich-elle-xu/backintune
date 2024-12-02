@@ -572,8 +572,8 @@ while True:
                     #if True: #flag>.5:
                     if blaze_landmark_type == "blazehandlandmark":
                         draw_landmarks(output, landmark[:,:2], HAND_CONNECTIONS, size=2)
-                        wrist_pos = np.array(landmark[0, :1])
-                        middle_finger_pos = np.array(landmark[9, :1])
+                        wrist_pos = np.array(landmark[0, :2])
+                        middle_finger_pos = np.array(landmark[9, :2])
                         cur_vector = np.subtract(middle_finger_pos, wrist_pos)
                         if (i == 0): 
                             right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))

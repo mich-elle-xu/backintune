@@ -1,5 +1,6 @@
 import numpy as np
 from collections import deque
+import random 
 
 class Hand: 
     def __init__(self, len_data, handedness): 
@@ -9,6 +10,7 @@ class Hand:
         self.tense = False
         self.neutral = np.array([0, 1])
         self.all_angles = []
+        self.spans = []
     
     def angle_between_vectors_np(self, v):
         angle_radians = np.arctan2(
@@ -20,6 +22,9 @@ class Hand:
         # angle_deg = np.degrees(angle_rad)
         angle_deg = np.degrees(angle_radians)
         return float(angle_deg)
+    
+    def add_span(self, span): 
+        self.spans.append(span)
 
     def add_angle(self, angle): 
         # self.hand_angles = self.hand_angles[1:]
@@ -45,6 +50,9 @@ class Hand:
         
         is_tension = np.sum(tension_zones) > (len(tension_zones) / 2)
         print(self.handedness + ": " + str(is_tension))
+
+        self.tension_states = np.roll(self.tension_states,-1)
+        self.tension_states[-1] = is_tension
         return is_tension
 
     def update_tension(self): 
@@ -52,6 +60,5 @@ class Hand:
         for val in self.tensions_states: 
             if val: 
                 temp += 1
-
         if temp > len(self.tensions_states) / 2: 
             self.tense = True
