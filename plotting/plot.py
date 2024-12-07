@@ -56,5 +56,5 @@ def plot_hand_data(filename):
     plt.show()
 
 # Example usage
-filename = 'angle_outputs/above_new/tense_hanon'  # Replace with your file name
+filename = 'angle_outputs/piece_clips/1_familiar_piece_4'  # Replace with your file name
 plot_hand_data(filename)

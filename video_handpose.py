@@ -11,8 +11,8 @@ import os
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
-output_dir = "angle_outputs/above_new"
-input_dir = "recordings/above"
+output_dir = "angle_outputs/piece_clips"
+input_dir = "recordings/split_clips"
 
 def main(): 
     for root, _, files in os.walk(input_dir):
@@ -62,37 +62,54 @@ def tense_routine(video_path):
                         mp_drawing_styles.get_default_hand_landmarks_style(),
                         mp_drawing_styles.get_default_hand_connections_style())
                     # print(ind)
-                for ind in range(len(results.multi_handedness)):
-                    label = results.multi_handedness[ind].classification[0].label
-                    if label == "Right":
-                        wrist_pos = np.array([landmark.landmark[0].x, landmark.landmark[0].y])
-                        middle_pos = np.array([landmark.landmark[9].x, landmark.landmark[9].y])
-                        cur_vector = np.subtract(middle_pos, wrist_pos)
-                        thumb_pos = np.array([landmark.landmark[2].x, landmark.landmark[2].y])
-                        pinky_pos = np.array([landmark.landmark[17].x, landmark.landmark[17].y]) 
-                        span = np.linalg.norm(thumb_pos - pinky_pos)
-                        right_hand.add_span(span)
-                        right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
-                        # print("wrist pos is: ", wrist_pos)
-                        # print("middle pos is: ", middle_pos)
-                        # print("cur vector is: ", cur_vector)
-                        # print(right_hand.hand_angles)
-                        # print(right_hand.all_angles)
+                angle_list = []
+                for ind in range(len(results.multi_handedness)): 
+                    # get landmark 9 on first loop
+                    # get landmark 9 on second loop 
 
-                    if label == "Left":
-                        wrist_pos = np.array([landmark.landmark[0].x, landmark.landmark[0].y])
-                        middle_pos = np.array([landmark.landmark[9].x, landmark.landmark[9].y])
-                        cur_vector = np.subtract(middle_pos, wrist_pos)
-                        thumb_pos = np.array([landmark.landmark[2].x, landmark.landmark[2].y])
-                        pinky_pos = np.array([landmark.landmark[17].x, landmark.landmark[17].y]) 
-                        span = np.linalg.norm(thumb_pos - pinky_pos)
-                        left_hand.add_span(span)
-                        left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
-                        # print("wrist pos is: ", wrist_pos)
-                        # print("middle pos is: ", middle_pos)
-                        # print("cur vector is: ", cur_vector)
-                        # print(left_hand.hand_angles)
-                        # print(left_hand.all_angles)
+                    wrist_pos = np.array([landmark.landmark[0].x, landmark.landmark[0].y])
+                    middle_pos = np.array([landmark.landmark[9].x, landmark.landmark[9].y])
+                    cur_vector = np.subtract(middle_pos, wrist_pos)
+                    thumb_pos = np.array([landmark.landmark[2].x, landmark.landmark[2].y])
+                    pinky_pos = np.array([landmark.landmark[17].x, landmark.landmark[17].y]) 
+                    span = np.linalg.norm(thumb_pos - pinky_pos)
+                    angle_list.append([middle_pos, right_hand.angle_between_vectors_np(cur_vector), span])
+                
+                angle_list.sort(key=lambda item: item[0][0])
+                right_hand.add_angle(angle_list[1][1])
+                right_hand.add_span(angle_list[1][2])
+                left_hand.add_angle(angle_list[0][1])
+                left_hand.add_span(angle_list[0][2])
+                    # label = results.multi_handedness[ind].classification[0].label
+                    # if label == "Right":
+                    #     wrist_pos = np.array([landmark.landmark[0].x, landmark.landmark[0].y])
+                    #     middle_pos = np.array([landmark.landmark[9].x, landmark.landmark[9].y])
+                    #     cur_vector = np.subtract(middle_pos, wrist_pos)
+                    #     thumb_pos = np.array([landmark.landmark[2].x, landmark.landmark[2].y])
+                    #     pinky_pos = np.array([landmark.landmark[17].x, landmark.landmark[17].y]) 
+                    #     span = np.linalg.norm(thumb_pos - pinky_pos)
+                    #     right_hand.add_span(span)
+                    #     right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
+                    #     # print("wrist pos is: ", wrist_pos)
+                    #     # print("middle pos is: ", middle_pos)
+                    #     # print("cur vector is: ", cur_vector)
+                    #     # print(right_hand.hand_angles)
+                    #     # print(right_hand.all_angles)
+
+                    # if label == "Left":
+                    #     wrist_pos = np.array([landmark.landmark[0].x, landmark.landmark[0].y])
+                    #     middle_pos = np.array([landmark.landmark[9].x, landmark.landmark[9].y])
+                    #     cur_vector = np.subtract(middle_pos, wrist_pos)
+                    #     thumb_pos = np.array([landmark.landmark[2].x, landmark.landmark[2].y])
+                    #     pinky_pos = np.array([landmark.landmark[17].x, landmark.landmark[17].y]) 
+                    #     span = np.linalg.norm(thumb_pos - pinky_pos)
+                    #     left_hand.add_span(span)
+                    #     left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
+                    #     # print("wrist pos is: ", wrist_pos)
+                    #     # print("middle pos is: ", middle_pos)
+                    #     # print("cur vector is: ", cur_vector)
+                    #     # print(left_hand.hand_angles)
+                    #     # print(left_hand.all_angles)
             else: 
                 print("No hands detected, ignoring frame.")
             # if there's been an update to the data 
