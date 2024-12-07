@@ -35,11 +35,15 @@ limitations under the License.
 #
 
 
+import tempfile
+frames_file = tempfile.NamedTemporaryFile(delete=False)
+frames_file.close()
 import numpy as np
 import cv2
 import os
 from datetime import datetime
 import itertools
+import signal
 
 from ctypes import *
 from typing import List
@@ -61,60 +65,46 @@ from hand_info import Hand
 
 import getpass
 import socket
+import csv
 # from threading import Thread
 
 from gpiozero import PWMOutputDevice
 # Define the buzzer on GPIO 17 (BCM pin 17)
 buzzer = PWMOutputDevice(17)
 
+TENSE_VAL = 1
+NOT_TENSE_VAL = 2
+EMPTY_VAL = 0
+
 esp32_ip = "http://172.26.175.168"
 
-# TODO: set these values with web app
 buzz_val = 0.2
 bViewOutput = False
 time_btwn_buzz = 2
 
-# tension = False
 relax = threading.Event()
 mutex = threading.Lock()
 gcolor = ""
 
-# curr_thread = None
-# thread_count = 0
-# existTimers = False
+time_stamp = int(time.time())
+csv_file = open(f"{time_stamp}.csv", mode='w', newline='')  # Open the file
+writer = csv.writer(csv_file)
+
+fps_es = []
 
 def buzz_per_sec():
-    print("new thread")
-    # global existTimers
-    # if tension:
-    # while tension:
+    # print("new thread")
     while True:
         play_frequency(1000)
         interrupted = relax.wait(time_btwn_buzz)
         if interrupted:
-            print("thread terminated")
+            # print("thread terminated")
             return
-        else:
-            print("time_btwn_buzz passed")
-    # else:
-        # buzz_per_sec()
-        # buzz_thread = threading.Timer(time_btwn_buzz,buzz_per_sec)
-        # buzz_thread.daemon = True
-        # buzz_thread.start()
-    # else:
-        # thread_count -= 1
-        # existTimers = False
-        # return
-
-# def poll_tense():
-#     while True:
-#         if not existTimers and tension:
-#             buzz_thread = threading.Timer(time_btwn_buzz, target=buzz_per_sec)
-#             buzz_thread.daemon = True
-#             buzz_thread.start()
+        # else:
+        #     print("time_btwn_buzz passed")
 
 def play_frequency(frequency):
-    print("BUZZ")
+    # print("BUZZ")
     # Frequency range for PWM control is 0-1000 Hz (adjustable)
     buzzer.frequency = frequency
     buzzer.value = buzz_val
@@ -122,21 +112,20 @@ def play_frequency(frequency):
     buzzer.off()  # Turn off the buzzer after playing
 
 def set_color(color):
-    # return
-    try:
-        requests.get(esp32_ip + color, timeout = 3)
-    except requests.exceptions.ConnectionError as e:
-        print(f"Connection error occurred: {e}")
-        time.sleep(0.1)
-        set_color(color)
-    except requests.exceptions.Timeout as e:
-        print(f"Request timed out: {e}")
-    except requests.exceptions.ConnectTimeout as e:
-        print(f"Request timed out: {e}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error during request: {e}")
+    return
+    # try:
+    #     requests.get(esp32_ip + color, timeout = 3)
+    # except requests.exceptions.ConnectionError as e:
+    #     print(f"Connection error occurred: {e}")
+    #     time.sleep(0.1)
+    #     set_color(color)
+    # except requests.exceptions.Timeout as e:
+    #     print(f"Request timed out: {e}")
+    # except requests.exceptions.ConnectTimeout as e:
+    #     print(f"Request timed out: {e}")
+    # except requests.exceptions.RequestException as e:
+    #     print(f"Error during request: {e}")
 
-# requests.get(esp32_ip + "/off")  # Turn LED off
 set_color("/off")
 
 user = getpass.getuser()
@@ -248,6 +237,8 @@ if os.path.exists(args.input):
 if bInputVideo == True:
     # Open video file
     cap = cv2.VideoCapture(args.input)
+    if not cap.isOpened():
+        print(f"[ERROR] Cannot open video file: {args.input}")
     frame_width = int(round(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))
     frame_height = int(round(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     print("[INFO] input : video ",args.input," (",frame_width,",",frame_height,")")
@@ -375,13 +366,14 @@ rt_fps_message = "FPS: {0:.2f}".format(rt_fps)
 rt_fps_x = int(10*scale)
 rt_fps_y = int((frame_height-10)*scale)
 
-frames = []
+# frames = []
 
 # poll_thread = threading.Thread(target=poll_tense)
 # poll_thread.daemon = True
 # poll_thread.start()
 
 try:
+    file = open(frames_file.name, "wb")
     while True:
         # init the real-time FPS counter
         if rt_fps_count == 0:
@@ -393,6 +385,10 @@ try:
         if not flag:
             print("[ERROR] cap.read() FAILEd !")
             break
+        # if not flag:  # End of video
+        #     print("[INFO] Video processing finished.")
+        #     # signal.raise_signal(signal.SIGINT)
+        #     break
 
         if blaze_pipelines["supported"] and blaze_pipelines["selected"]:
 
@@ -437,16 +433,11 @@ try:
             
             normalized_detections = blaze_detector.predict_on_image(img1)
             if len(normalized_detections) <= 0:
-                # if not relax.is_set():
-                #     print("NOT TENSE ==> hands exited")
-                #     with mutex:
-                #         relax.set()
                 if "/red" != gcolor:
                     gcolor = "/red"
                     red = threading.Thread(target=set_color, args=("/red",))
                     red.daemon = True
                     red.start()
-                    # tension = False
             if len(normalized_detections) > 0:
 
                 start = timer()          
@@ -457,6 +448,9 @@ try:
                 profile_extract = timer()-start
 
                 flags, normalized_landmarks = blaze_landmark.predict(roi_img)
+                # print(normalized_landmarks)
+                
+
                 # print(flags, normalized_landmarks)
                 
                 if bShowDebugImage:
@@ -495,6 +489,7 @@ try:
                         green.daemon = True
                         green.start()
 
+                angle_list = []
                 for i in range(len(flags)):
                     landmark, flag = landmarks[i], flags[i]
                     #if True: #flag>.5:
@@ -503,6 +498,11 @@ try:
                         wrist_pos = np.array(landmark[0, :2])
                         middle_finger_pos = np.array(landmark[9, :2])
                         cur_vector = np.subtract(middle_finger_pos, wrist_pos)
+                        thumb_pos = np.array(landmark[2, :2])
+                        pinky_pos = np.array(landmark[17, :2])
+                        span = np.linalg.norm(thumb_pos - pinky_pos)
+                        angle_list.append([middle_finger_pos, right_hand.angle_between_vectors_np(cur_vector), span])
+                        # maybe change this
                         if (i == 0): 
                             right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
                             right_hand.update_tension_states()
@@ -515,10 +515,17 @@ try:
                         if landmarks.shape[1] > 33:
                             draw_landmarks(output, landmark[:,:2], POSE_FULL_BODY_CONNECTIONS, size=2)
                         else:
-                            draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)                
-                    
+                            draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)
+                
+                if (len(flags) == 2):
+                    angle_list.sort(key=lambda item: item[0][0])
+                    right_hand.add_angle(angle_list[1][1])
+                    right_hand.add_span(angle_list[1][2])
+                    left_hand.add_angle(angle_list[0][1])
+                    left_hand.add_span(angle_list[0][2])
+
                 if right_hand.tense and relax.is_set():
-                    print("TENSE")
+                    # print("TENSE")
                     # play_frequency(1000)
                     # tension = True
                     with mutex:
@@ -529,7 +536,7 @@ try:
                     buzz_thread.daemon = True  # Make it a daemon thread
                     buzz_thread.start()
                 elif not right_hand.tense and not relax.is_set():
-                    print("NOT TENSE")
+                    # print("NOT TENSE")
                     # tension = False
                     with mutex:
                         relax.set()
@@ -537,6 +544,16 @@ try:
                 draw_roi(output,roi_box)
                 draw_detections(output,detections)
                 profile_annotate = timer()-start
+            
+            if len(normalized_detections) > 0:
+                if right_hand.tense:
+                    val = TENSE_VAL
+                else:
+                    val = NOT_TENSE_VAL
+            else:
+                val = EMPTY_VAL
+            
+            writer.writerow([val])
 
             if bShowDebugImage:
                 if debug_img.shape[0] == debug_img.shape[1]:
@@ -554,7 +571,12 @@ try:
                 cv2.imshow(app_main_title, output)
             
             # TODO: enable this through web app?
-            frames += [output]
+            # frames += [output]
+            # Encode the frame as bytes
+            _, buffer = cv2.imencode('.jpg', output)  # Encoding frame as JPEG for storage
+            file.write(len(buffer).to_bytes(4, 'big'))  # Write the size of the frame
+            # print("FRAME LENGTH: ", len(buffer), len(buffer).to_bytes(4, 'big'))
+            file.write(buffer)  # Write the frame data
                 
         cv2.waitKey(1)
 
@@ -565,6 +587,7 @@ try:
             rt_fps_valid = 1
             rt_fps = 10.0/t
             rt_fps_message = "FPS: {0:.2f}".format(rt_fps)
+            fps_es += [rt_fps]
             #print("[INFO] ",rt_fps_message)
             rt_fps_count = 0
 
@@ -573,14 +596,33 @@ except KeyboardInterrupt:
     print("Process interrupted by user.")
 
 finally:
+    file.close()
     print("FINALLY")
     # requests.get(esp32_ip + "/off")  # Turn LED off
     set_color("/off")
     # Get the size of the first frame (ensure all frames are the same size)
-    height, width, _ = frames[0].shape
+    # height, width, _ = frames[0].shape
+    with open(frames_file.name, "rb") as file:
+        # while True:
+        size_data = file.read(4)  # Read the size of the frame
+        # if not size_data:
+        #     break
+
+        size = int.from_bytes(size_data, 'big')  # Decode the size
+        buffer = file.read(size)  # Read the frame data
+        frame = cv2.imdecode(np.frombuffer(buffer, dtype=np.uint8), cv2.IMREAD_COLOR)
+        height, width, _ = frame.shape
 
     # Create a unique filename using the current time or any other method you prefer
-    unique_filename = f"{int(time.time())}.mp4"  # Unique name based on timestamp
+    unique_filename = f"{time_stamp}.mp4"  # Unique name based on timestamp
+
+    csv_file.close()
+    
+    csv_file = open(f"{time_stamp}.csv", mode='r')
+    reader = csv.reader(csv_file)
+    row_count = sum(1 for row in reader)  # Count the rows
+    csv_file.close()
+    # print("ROW_COUNT", row_count, "FRAME_COUNT", len(frames))
 
     # Define the codec and create a VideoWriter object
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'mp4v' for MP4 format (or another codec)
@@ -588,11 +630,37 @@ finally:
     fps = 20  # Frames per second, adjust based on your needs
     output_video = cv2.VideoWriter(unique_filename, fourcc, fps, (width, height))
 
+    start_time = time.perf_counter()
+
     # Write frames to video
-    for frame in frames:
-        output_video.write(frame)  # Write each frame to the video
+    # for frame in frames:
+    #     output_video.write(frame)  # Write each frame to the video
+    with open(frames_file.name, "rb") as file:
+        while True:
+            size_data = file.read(4)  # Read the size of the frame
+            if not size_data:
+                break
+
+            size = int.from_bytes(size_data, 'big')  # Decode the size
+            buffer = file.read(size)  # Read the frame data
+            frame = cv2.imdecode(np.frombuffer(buffer, dtype=np.uint8), cv2.IMREAD_COLOR)
+            
+            # Write the frame to the video
+            output_video.write(frame)
+    
+    end_time = time.perf_counter()
+
+    processing_time_seconds = end_time - start_time
+    print(f"Total processing time: {processing_time_seconds:.2f} seconds")
+    
+    # find average fps
+    print("Average FPS:", sum(fps_es)/len(fps_es))
+
+    print("LEFT_HAND:", left_hand.all_angles)
+    print("RIGHT_HAND:", right_hand.all_angles)
 
     # Cleanup
+    os.remove(frames_file.name)
     output_video.release()
     f_profile_csv.close()
     cv2.destroyAllWindows()
