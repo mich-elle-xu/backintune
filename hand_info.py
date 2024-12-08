@@ -1,9 +1,10 @@
 import numpy as np
 from collections import deque
 import random 
+import time
 
 class Hand: 
-    def __init__(self, len_data, handedness): 
+    def __init__(self, len_data, handedness, start_time): 
         self.handedness = handedness
         self.hand_angles = np.zeros(len_data) 
         self.tension_states = np.zeros(len_data)
@@ -36,7 +37,9 @@ class Hand:
         # print("adding ", angle, "to hand_hangles")
         # np.append(self.hand_angles, angle)
         # print(self.hand_angles)
-        self.all_angles.append(angle)
+        cur_time = time.time()
+        elapsed_time = cur_time - self.start_time
+        self.all_angles.append((elapsed_time, angle))
 
     def update_tension_states(self, threshold=0.5, window_size=3):
         # Compute the difference between consecutive wrist angles (rate of change)
