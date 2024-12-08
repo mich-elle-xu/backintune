@@ -7,6 +7,7 @@ class Hand:
         self.handedness = handedness
         self.hand_angles = np.zeros(len_data) 
         self.tension_states = np.zeros(len_data)
+        self.all_tensions = []
         self.tense = False
         self.neutral = np.array([0, 1])
         self.all_angles = []
@@ -52,6 +53,7 @@ class Hand:
         print(self.handedness + ": " + str(is_tension))
 
         self.tension_states = np.roll(self.tension_states,-1)
+        self.all_tensions.append(is_tension)
         self.tension_states[-1] = is_tension
         return is_tension
 

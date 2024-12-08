@@ -23,10 +23,10 @@ def plot_hand_data(filename):
     left_hand_data = [normalize_data(value) for value in left_hand_data]
     # left_hand_span = [normalize_data(value) for value in left_hand_span]
     
-    right_hand_data = right_hand_data[:1000]
-    right_hand_span = right_hand_span[:1000]
-    left_hand_data = left_hand_data[:1000]
-    left_hand_span = left_hand_span[:1000]
+    right_hand_data = right_hand_data[:500]
+    right_hand_span = right_hand_span[:500]
+    left_hand_data = left_hand_data[:500]
+    left_hand_span = left_hand_span[:500]
 
     # Pad the shorter list with None values to match the length of the longer list
     max_len = max(len(right_hand_data), len(left_hand_data))
@@ -56,5 +56,6 @@ def plot_hand_data(filename):
     plt.show()
 
 # Example usage
-filename = 'angle_outputs/piece_clips/1_familiar_piece_4'  # Replace with your file name
+# filename = 'angle_outputs/above_new/non_tense_hanon' 
+filename = 'angle_outputs/above_new/non_tense_hanon'  # Replace with your file name
 plot_hand_data(filename)
