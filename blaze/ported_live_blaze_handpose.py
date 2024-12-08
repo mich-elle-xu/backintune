@@ -140,8 +140,11 @@ sys.path.append(os.path.abspath('blaze_vitisai/'))
 sys.path.append(os.path.abspath('blaze_hailo/'))
 
 # TODO: figure out how to put 2 hands
-right_hand = Hand(10, "right")
-left_hand = Hand(10, "left")
+
+timestamp = time.time()
+right_hand = Hand(10, "right", timestamp)
+left_hand = Hand(10, "left", timestamp)
+
 
 blaze_hailo_supported = False
 try:
@@ -501,14 +504,22 @@ try:
                         thumb_pos = np.array(landmark[2, :2])
                         pinky_pos = np.array(landmark[17, :2])
                         span = np.linalg.norm(thumb_pos - pinky_pos)
-                        angle_list.append([middle_finger_pos, right_hand.angle_between_vectors_np(cur_vector), span])
+                        mid_to_thumb = np.subtract(thumb_pos, middle_finger_pos)
+                        angle_list.append([middle_finger_pos[0], right_hand.angle_between_vectors_np(cur_vector), span])
+                        if (mid_to_thumb[0] < 0) :
+                            # left hand
+                            print("ITS LEFT", mid_to_thumb)
+                            left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
+                            left_hand.update_tension_states()
+                            left_hand.add_span(span)
+                            left_hand.update_tension()
                         # maybe change this
-                        if (i == 0): 
+                        else:
+                            print("ITS RIGHT", mid_to_thumb)
                             right_hand.add_angle(right_hand.angle_between_vectors_np(cur_vector))
                             right_hand.update_tension_states()
+                            right_hand.add_span(span)
                             right_hand.update_tension()
-                        else:
-                            left_hand.add_angle(left_hand.angle_between_vectors_np(cur_vector))
                     elif blaze_landmark_type == "blazefacelandmark":
                         draw_landmarks(output, landmark[:,:2], FACE_CONNECTIONS, size=1)                                    
                     elif blaze_landmark_type == "blazeposelandmark":
@@ -517,14 +528,15 @@ try:
                         else:
                             draw_landmarks(output, landmark[:,:2], POSE_UPPER_BODY_CONNECTIONS, size=2)
                 
-                if (len(flags) == 2):
-                    angle_list.sort(key=lambda item: item[0][0])
-                    right_hand.add_angle(angle_list[1][1])
-                    right_hand.add_span(angle_list[1][2])
-                    left_hand.add_angle(angle_list[0][1])
-                    left_hand.add_span(angle_list[0][2])
+                # if (len(flags) == 2):
+                #     angle_list.sort(key=lambda item: item[0][0])
+                #     right_hand.add_angle(angle_list[1][1])
+                #     right_hand.add_span(angle_list[1][2])
+                #     left_hand.add_angle(angle_list[0][1])
+                #     left_hand.add_span(angle_list[0][2])
 
-                if right_hand.tense and relax.is_set():
+                print("right hand tense", right_hand.tense, "left hand tense", left_hand.tense, "relaxed?", relax.is_set())
+                if (right_hand.tense or left_hand.tense) and relax.is_set():
                     # print("TENSE")
                     # play_frequency(1000)
                     # tension = True
@@ -535,7 +547,7 @@ try:
                     # thread_count += 1
                     buzz_thread.daemon = True  # Make it a daemon thread
                     buzz_thread.start()
-                elif not right_hand.tense and not relax.is_set():
+                elif not right_hand.tense and not left_hand.tense and not relax.is_set():
                     # print("NOT TENSE")
                     # tension = False
                     with mutex:
@@ -656,8 +668,8 @@ finally:
     # find average fps
     print("Average FPS:", sum(fps_es)/len(fps_es))
 
-    print("LEFT_HAND:", left_hand.all_angles)
-    print("RIGHT_HAND:", right_hand.all_angles)
+    # print("LEFT_HAND:", left_hand.all_angles)
+    # print("RIGHT_HAND:", right_hand.all_angles)
 
     # Cleanup
     os.remove(frames_file.name)

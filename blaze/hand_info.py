@@ -1,16 +1,21 @@
 import numpy as np
 from collections import deque
-import random
+import random 
+import time
+from filter import ExponentialMovingAverageFilter
 
 class Hand: 
-    def __init__(self, len_data, handedness): 
+    def __init__(self, len_data, handedness, start_time): 
+        self.start_time = start_time
         self.handedness = handedness
         self.hand_angles = np.zeros(len_data) 
-        # self.tension_states = np.zeros(len_data)
-        self.tension_states = np.zeros(20)
+        self.tension_states = np.zeros(len_data)
+        self.all_tensions = []
         self.tense = False
         self.neutral = np.array([0, 1])
         self.all_angles = []
+        self.spans = []
+        self.ema_filter = ExponentialMovingAverageFilter(alpha=0.5)
     
     def angle_between_vectors_np(self, v):
         angle_radians = np.arctan2(
@@ -22,6 +27,9 @@ class Hand:
         # angle_deg = np.degrees(angle_rad)
         angle_deg = np.degrees(angle_radians)
         return float(angle_deg)
+    
+    def add_span(self, span): 
+        self.spans.append(span)
 
     def add_angle(self, angle): 
         # self.hand_angles = self.hand_angles[1:]
@@ -29,13 +37,18 @@ class Hand:
         # np.delete(self.hand_angles, 0)
         self.hand_angles = np.roll(self.hand_angles,-1)
         self.hand_angles[-1] = angle
+        smoothed_angles = self.ema_filter.filter(self.hand_angles)
+        self.hand_angles = smoothed_angles
         # print("adding ", angle, "to hand_hangles")
         # np.append(self.hand_angles, angle)
         # print(self.hand_angles)
-        self.all_angles.append(angle)
+        cur_time = time.time()
+        elapsed_time = cur_time - self.start_time
+        self.all_angles.append((elapsed_time, angle))
 
-    def update_tension_states(self, threshold=20, window_size=3):
+    def update_tension_states(self, threshold=0.5, window_size=3):
         # Compute the difference between consecutive wrist angles (rate of change)
+        # print("TYPE", type(self.hand_angles))
         angle_changes = np.abs(np.diff(self.hand_angles, n=1))
         
         # Create a sliding window of changes and compute the average change in that window
@@ -47,15 +60,18 @@ class Hand:
         
         is_tension = np.sum(tension_zones) > (len(tension_zones) / 2)
         print(self.handedness + ": " + str(is_tension))
-        # is_tension = random.choice([0,1])
+
         self.tension_states = np.roll(self.tension_states,-1)
+        self.all_tensions.append(is_tension)
         self.tension_states[-1] = is_tension
+        print("self.tension_states", self.tension_states)
         return is_tension
 
     def update_tension(self): 
         temp = 0
-        temp = sum(self.tension_states)
-
+        for val in self.tension_states: 
+            if val: 
+                temp += 1
         if temp > len(self.tension_states) / 2: 
             self.tense = True
         else:
