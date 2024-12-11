@@ -72,6 +72,42 @@ from gpiozero import PWMOutputDevice
 # Define the buzzer on GPIO 17 (BCM pin 17)
 buzzer = PWMOutputDevice(17)
 
+import RPi.GPIO as GPIO
+
+# Pin configuration
+RED_PIN = 19
+GREEN_PIN = 13
+BLUE_PIN = 26
+
+# GPIO setup
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(RED_PIN, GPIO.OUT)
+GPIO.setup(GREEN_PIN, GPIO.OUT)
+GPIO.setup(BLUE_PIN, GPIO.OUT)
+
+# Set up PWM for each color
+FREQ = 100  # Frequency in Hz
+red_pwm = GPIO.PWM(RED_PIN, FREQ)
+green_pwm = GPIO.PWM(GREEN_PIN, FREQ)
+blue_pwm = GPIO.PWM(BLUE_PIN, FREQ)
+
+# Start PWM with 0% duty cycle (LEDs off)
+red_pwm.start(0)
+green_pwm.start(0)
+blue_pwm.start(0)
+
+def set_color(red, green, blue):
+    """Set the color of the RGB LED.
+    
+    Args:
+        red (int): Red intensity (0 to 100).
+        green (int): Green intensity (0 to 100).
+        blue (int): Blue intensity (0 to 100).
+    """
+    red_pwm.ChangeDutyCycle(red)
+    green_pwm.ChangeDutyCycle(green)
+    blue_pwm.ChangeDutyCycle(blue)
+
 TENSE_VAL = 1
 NOT_TENSE_VAL = 2
 EMPTY_VAL = 0
@@ -89,6 +125,9 @@ gcolor = ""
 time_stamp = int(time.time())
 csv_file = open(f"{time_stamp}.csv", mode='w', newline='')  # Open the file
 writer = csv.writer(csv_file)
+
+tense_file = open(f"/home/jessiefan/backintune/accelerated_rpi/django-volt-dashboard/videos/{time_stamp}.csv", mode="a", newline="")
+tense_writer = tense_writer = csv.writer(tense_file)
 
 fps_es = []
 
@@ -111,7 +150,7 @@ def play_frequency(frequency):
     time.sleep(0.1)  # Play the tone for 0.25 seconds
     buzzer.off()  # Turn off the buzzer after playing
 
-def set_color(color):
+def set_LED(color):
     return
     # try:
     #     requests.get(esp32_ip + color, timeout = 3)
@@ -126,7 +165,8 @@ def set_color(color):
     # except requests.exceptions.RequestException as e:
     #     print(f"Error during request: {e}")
 
-set_color("/off")
+# turns LED off
+set_color(0, 0, 0)
 
 user = getpass.getuser()
 host = socket.gethostname()
@@ -438,7 +478,7 @@ try:
             if len(normalized_detections) <= 0:
                 if "/red" != gcolor:
                     gcolor = "/red"
-                    red = threading.Thread(target=set_color, args=("/red",))
+                    red = threading.Thread(target=set_color, args=(0, 0, 100))
                     red.daemon = True
                     red.start()
             if len(normalized_detections) > 0:
@@ -480,7 +520,7 @@ try:
                     # requests.get(esp32_ip + "/red")   # Turn LED red
                     if "/red" != gcolor:
                         gcolor = "/red"
-                        red = threading.Thread(target=set_color, args=("/red",))
+                        red = threading.Thread(target=set_color, args=(0, 0, 100))
                         red.daemon = True
                         red.start()
                 else:
@@ -488,7 +528,7 @@ try:
                     # print("GREEN")
                     if "/green" != gcolor:
                         gcolor = "/green"
-                        green = threading.Thread(target=set_color, args=("/green",))
+                        green = threading.Thread(target=set_color, args=(0, 100, 0))
                         green.daemon = True
                         green.start()
 
@@ -536,6 +576,8 @@ try:
                 #     left_hand.add_span(angle_list[0][2])
 
                 print("right hand tense", right_hand.tense, "left hand tense", left_hand.tense, "relaxed?", relax.is_set())
+                tense_writer.writerow((right_hand.tense or left_hand.tense, time.time()))
+                
                 if (right_hand.tense or left_hand.tense) and relax.is_set():
                     # print("TENSE")
                     # play_frequency(1000)
@@ -611,7 +653,7 @@ finally:
     file.close()
     print("FINALLY")
     # requests.get(esp32_ip + "/off")  # Turn LED off
-    set_color("/off")
+    set_color(0, 0, 0)
     # Get the size of the first frame (ensure all frames are the same size)
     # height, width, _ = frames[0].shape
     with open(frames_file.name, "rb") as file:
@@ -626,8 +668,9 @@ finally:
         height, width, _ = frame.shape
 
     # Create a unique filename using the current time or any other method you prefer
-    unique_filename = f"{time_stamp}.mp4"  # Unique name based on timestamp
+    unique_filename = f"tmp_{time_stamp}.mp4"  # Unique name based on timestamp
 
+    tense_file.close()
     csv_file.close()
     
     csv_file = open(f"{time_stamp}.csv", mode='r')
@@ -670,9 +713,30 @@ finally:
 
     # print("LEFT_HAND:", left_hand.all_angles)
     # print("RIGHT_HAND:", right_hand.all_angles)
+    with open(f"left_hand_{time_stamp}.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerows(left_hand.all_angles)
+     
+    with open(f"right_hand_{time_stamp}.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerows(right_hand.all_angles)
 
     # Cleanup
     os.remove(frames_file.name)
     output_video.release()
+
+    # Convert the video to H.264 codec using FFmpeg
+    converted_filename = f"/home/jessiefan/backintune/accelerated_rpi/django-volt-dashboard/videos/{time_stamp}.mp4"
+    ffmpeg_command = [
+        "ffmpeg",
+        "-i", unique_filename,            # Input file
+        "-vcodec", "libx264",             # Video codec
+        "-crf", "23",                     # Quality level (lower is better, 23 is default)
+        converted_filename                # Output file
+    ]
+
+    # Run the FFmpeg command
+    subprocess.run(ffmpeg_command, check=True)
+
     f_profile_csv.close()
     cv2.destroyAllWindows()
