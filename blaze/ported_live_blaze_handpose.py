@@ -307,8 +307,10 @@ if bInputCamera == True:
 
     # Open video
     cap = cv2.VideoCapture(input_video)
+    # frame_width = 1280
+    # frame_height = 720
     frame_width = 640
-    frame_height = 480
+    frame_height = 360
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,frame_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,frame_height)
     print("[INFO] input : camera",input_video," (",frame_width,",",frame_height,")")
@@ -478,7 +480,7 @@ try:
             if len(normalized_detections) <= 0:
                 if "/red" != gcolor:
                     gcolor = "/red"
-                    red = threading.Thread(target=set_color, args=(0, 0, 100))
+                    red = threading.Thread(target=set_color, args=(100, 0, 0))
                     red.daemon = True
                     red.start()
             if len(normalized_detections) > 0:
@@ -520,7 +522,7 @@ try:
                     # requests.get(esp32_ip + "/red")   # Turn LED red
                     if "/red" != gcolor:
                         gcolor = "/red"
-                        red = threading.Thread(target=set_color, args=(0, 0, 100))
+                        red = threading.Thread(target=set_color, args=(100, 0, 0))
                         red.daemon = True
                         red.start()
                 else:
@@ -703,11 +705,6 @@ finally:
             # Write the frame to the video
             output_video.write(frame)
     
-    end_time = time.perf_counter()
-
-    processing_time_seconds = end_time - start_time
-    print(f"Total processing time: {processing_time_seconds:.2f} seconds")
-    
     # find average fps
     print("Average FPS:", sum(fps_es)/len(fps_es))
 
@@ -737,6 +734,11 @@ finally:
 
     # Run the FFmpeg command
     subprocess.run(ffmpeg_command, check=True)
+
+    end_time = time.perf_counter()
+
+    processing_time_seconds = end_time - start_time
+    print(f"Total processing time: {processing_time_seconds:.2f} seconds")
 
     f_profile_csv.close()
     cv2.destroyAllWindows()
